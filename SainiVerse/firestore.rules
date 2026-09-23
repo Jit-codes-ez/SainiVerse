@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to ensure only the authorized partner emails can access anything
+    function isCoupleMember() {
+      return request.auth != null && (
+        request.auth.token.email.lower() in [
+          'hers.jit@gmail.com',
+          'his.saini.gulu@gmail.com',
+          'jithazra00@gmail.com',
+          'sainipaul000@gmail.com'
+        ]
+      );
+    }
+
+    // Public Memory Details: public gallery can read memories, modifications strictly for couple
+    match /Public_Memory_Details/{memoryId} {
+      allow read: if true;
+      allow create, update, delete: if isCoupleMember();
+    }
+
+    // Private Memory Details: strictly restricted to authenticated couple
+    match /Private_Memory_Details/{memoryId} {
+      allow read, create, update, delete: if isCoupleMember();
+    }
+
+    // Legacy memories store: backward compatibility
+    match /memories/{memoryId} {
+      allow read: if true;
+      allow create, update, delete: if isCoupleMember();
+    }
+
+    // Strict deny-all fallback for any other collection or document
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

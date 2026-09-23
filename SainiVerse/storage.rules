@@ -1,0 +1,44 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function verifying user authentication and couple allowlist
+    // Note: Replace the emails below with your exact couple emails
+    function isCoupleMember() {
+      return request.auth != null && (
+        request.auth.token.email.lower() in [
+          'hers.jit@gmail.com',
+          'his.saini.gulu@gmail.com'
+        ]
+      );
+    }
+
+    // Memories photo vault: /memories/{allPaths=**}
+    match /memories/{allPaths=**} {
+      // Only allowed couple members can download or stream image bytes
+      allow read: if isCoupleMember();
+      
+      // Only allowed couple members can upload images (must be image mime-type and max 25MB)
+      allow write: if isCoupleMember()
+                   && request.resource.size < 25 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+
+      // Only couple members can delete
+      allow delete: if isCoupleMember();
+    }
+
+    // Universe songs vault: /songs/{allPaths=**}
+    match /songs/{allPaths=**} {
+      allow read: if true;
+      allow write: if isCoupleMember()
+                   && request.resource.size < 50 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+      allow delete: if isCoupleMember();
+    }
+
+    // Default deny for all other storage paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

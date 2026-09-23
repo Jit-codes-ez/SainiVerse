@@ -1,0 +1,26 @@
+[
+  {
+    "id": "origin",
+    "question": "Who is SainiVerse built for?",
+    "icon": "Heart",
+    "answer": "SainiVerse is an exclusive, private digital sanctuary created with eternal love by Jit for Saini Paul. It is a quiet haven without algorithms, ads, or noise — built purely to honor our bond and celebrate every moment we share."
+  },
+  {
+    "id": "orbit",
+    "question": "What does 'Curated memories, endless orbit' mean?",
+    "icon": "Compass",
+    "answer": "Just like celestial bodies bound together by gravity, our love is an infinite orbit. Every single day, smile, and shared photograph is preserved here so that our journey never fades with time."
+  },
+  {
+    "id": "melody",
+    "question": "What is the melody playing in the universe?",
+    "icon": "Music",
+    "answer": "The universe is set to 'Bhalobashar Morshum' (ভালবাসার মরশুম) — a tender, timeless Bengali melody that echoes the gentle rhythm of our love and shared memories."
+  },
+  {
+    "id": "security",
+    "question": "How is our private sanctuary protected?",
+    "icon": "ShieldCheck",
+    "answer": "Every photo uploaded is automatically sanitized to remove camera EXIF and GPS markers. Our memories are preserved in a secure private cloud, and our deepest letters are protected behind the private passcode vault."
+  }
+]

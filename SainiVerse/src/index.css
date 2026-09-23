@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Arizonia&family=Berkshire+Swash&family=Playfair+Display:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Local zero-latency self-hosted font definitions with CDN fallbacks */
+@font-face {
+  font-family: 'Arizonia';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Arizonia.woff2') format('woff2'),
+       url('/fonts/Arizonia.ttf') format('truetype'),
+       url('https://fonts.gstatic.com/s/arizonia/v23/neIIzCemt4A5qa7mv5WBFqw.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Berkshire Swash';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/BerkshireSwash.woff2') format('woff2'),
+       url('/fonts/BerkshireSwash.ttf') format('truetype'),
+       url('https://fonts.gstatic.com/s/berkshireswash/v22/ptRRTi-cavZOGqCvnNJDl5m5XmN_qs4z.woff2') format('woff2');
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes slowJump {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes slowJumpShadow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(0.85);
+    opacity: 0.18;
+  }
+}
+
+@keyframes spinGlare {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-slow-jump {
+  animation: slowJump 3s ease-in-out infinite;
+}
+
+.animate-slow-jump-shadow {
+  animation: slowJumpShadow 3s ease-in-out infinite;
+}
+
+.animate-spin-glare {
+  animation: spinGlare var(--duration, 7s) linear infinite;
+}
+
+
+
+@layer base {
+  body {
+    background-color: #FFF1F2;
+    color: #1f2937;
+  }
+
+  /* Prevent default browser image drag and text selection on protected media */
+  .no-scrape {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Custom smooth pastel scrollbar */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #FFF1F2;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #fecdd6;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #fb718e;
+  }
+}
+
+@layer utilities {
+  .font-arizonia {
+    font-family: 'Arizonia', cursive !important;
+  }
+
+  .font-berkshire {
+    font-family: 'Berkshire Swash', cursive, serif !important;
+  }
+
+
+  .pastel-glass {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(244, 63, 94, 0.16);
+    box-shadow: 0 10px 30px -5px rgba(244, 63, 94, 0.08);
+  }
+
+  .pastel-card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(254, 205, 214, 0.8);
+    box-shadow: 0 8px 24px -4px rgba(244, 63, 94, 0.06);
+  }
+
+  .pastel-card:hover {
+    border-color: rgba(244, 63, 94, 0.35);
+    box-shadow: 0 16px 36px -6px rgba(244, 63, 94, 0.14);
+  }
+
+  .vault-gradient-text {
+    background: linear-gradient(135deg, #e11d58 0%, #f43f6e 50%, #fb718e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
