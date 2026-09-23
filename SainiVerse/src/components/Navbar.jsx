@@ -46,6 +46,9 @@ export default function Navbar({
   const shouldReduceMotion = useReducedMotion();
   const { scrollY } = useScroll();
 
+  const lastScrollYRef = useRef(0);
+  const scrollAccRef = useRef(0);
+
   // Click anywhere outside to close the Together anniversary popup
   useEffect(() => {
     if (!showCounterDetail) return;
@@ -60,24 +63,34 @@ export default function Navbar({
     };
   }, [showCounterDetail]);
 
-  // SmoothUI Floating Navbar Scroll Dynamics
+  // Smooth Floating Navbar Scroll Dynamics with Hysteresis & Jitter Elimination
   useMotionValueEvent(scrollY, 'change', (latest) => {
-    const previous = scrollY.getPrevious() ?? latest;
+    const previous = lastScrollYRef.current;
     const delta = latest - previous;
+    lastScrollYRef.current = latest;
 
-    setIsShrunk(latest > 90);
+    setIsShrunk(latest > 50);
 
-    // Keep visible near top, when reduced motion is preferred, or when modals are active
-    if (shouldReduceMotion || latest < 32 || isModalActive) {
+    // Keep visible near top of page (< 70px), when reduced motion is preferred, or when modals are active
+    if (shouldReduceMotion || latest < 70 || isModalActive) {
       setIsHidden(false);
+      scrollAccRef.current = 0;
       return;
     }
 
-    // Auto-hide when scrolling down, reveal when scrolling up
-    if (delta > 4) {
+    // Reset accumulator on direction change to eliminate touch micro-jitter
+    if ((delta > 0 && scrollAccRef.current < 0) || (delta < 0 && scrollAccRef.current > 0)) {
+      scrollAccRef.current = 0;
+    }
+    scrollAccRef.current += delta;
+
+    // Only hide if user has intentionally scrolled down by at least 25px
+    if (scrollAccRef.current > 25) {
       setIsHidden(true);
       setShowCounterDetail(false);
-    } else if (delta < -4) {
+    }
+    // Only reveal if user has intentionally scrolled up by at least 15px
+    else if (scrollAccRef.current < -15) {
       setIsHidden(false);
     }
   });
@@ -105,18 +118,18 @@ export default function Navbar({
 
       {/* Floating Navbar Container (SmoothUI motion architecture, z-30 for popup backgrounding) */}
       <motion.header
-        animate={
-          shouldReduceMotion
-            ? { opacity: isHidden ? 0 : isModalActive ? 0.45 : 1, y: 0 }
-            : { opacity: isHidden ? 0 : isModalActive ? 0.45 : 1, y: isHidden ? -90 : 0 }
-        }
-        transition={
-          shouldReduceMotion
-            ? { duration: 0 }
-            : { duration: 0.28, ease: [0.645, 0.045, 0.355, 1] }
-        }
-        style={isHidden || isModalActive ? { pointerEvents: isModalActive ? 'none' : 'none' } : undefined}
-        className={`fixed top-2.5 sm:top-4 inset-x-0 z-30 mx-auto px-2.5 sm:px-4 md:px-6 pointer-events-none flex justify-center transition-all duration-300 ${
+        animate={{
+          opacity: isHidden ? 0 : isModalActive ? 0.45 : 1,
+          y: isHidden ? -85 : 0,
+        }}
+        transition={{
+          duration: shouldReduceMotion ? 0 : 0.25,
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
+        style={{
+          pointerEvents: isHidden || isModalActive ? 'none' : undefined,
+        }}
+        className={`fixed top-2 xs:top-2.5 sm:top-4 inset-x-0 z-30 mx-auto px-1.5 xs:px-2.5 sm:px-4 md:px-6 pointer-events-none flex justify-center ${
           isModalActive ? 'filter blur-[1px]' : ''
         }`}
       >
@@ -153,22 +166,22 @@ export default function Navbar({
 
         {/* Pinkish-White Glassy Floating Capsule */}
         <div
-          className={`pointer-events-auto relative w-full max-w-7xl mx-auto flex items-center justify-between gap-1.5 xs:gap-2 sm:gap-3 md:gap-4 rounded-2xl sm:rounded-[22px] border border-rose-200/80 bg-gradient-to-r from-rose-50/80 via-white/90 to-pink-50/80 backdrop-blur-2xl shadow-xl shadow-rose-950/5 transition-all duration-300 ${
+          className={`pointer-events-auto relative w-full max-w-7xl mx-auto flex items-center justify-between gap-1 xs:gap-1.5 sm:gap-3 md:gap-4 rounded-2xl sm:rounded-[22px] border border-rose-200/80 bg-gradient-to-r from-rose-50/85 via-white/95 to-pink-50/85 backdrop-blur-2xl transition-shadow duration-300 ${
             isShrunk
-              ? 'py-1 px-2 xs:px-2.5 sm:px-4 md:px-5 shadow-2xl bg-white/95 border-rose-300/80 scale-[0.99]'
-              : 'py-1.5 xs:py-2 sm:py-2.5 px-2.5 xs:px-3 sm:px-5 md:px-6'
-          }`}
+              ? 'shadow-xl shadow-rose-950/10 border-rose-300/80 bg-white/95'
+              : 'shadow-md shadow-rose-950/5'
+          } py-1.5 xs:py-2 px-2 xs:px-2.5 sm:px-4 md:px-6`}
         >
           {/* 1. LEFT: Logo & Date Milestone Counter */}
-          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 md:gap-4 shrink-0 min-w-0">
             {/* Brand Logo: Clickable with smooth hover effect to navigate Home */}
             <button
               type="button"
               onClick={() => handleTabClick('home')}
-              className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 md:gap-3.5 group cursor-pointer text-left transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 group cursor-pointer text-left transition-transform duration-200 active:scale-[0.98] shrink-0"
               title="Return to SainiVerse Home"
             >
-              <div className="w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full bg-gradient-to-tr from-rose-500 via-rose-400 to-pink-400 p-0.5 flex items-center justify-center shadow-md shadow-rose-400/30 group-hover:shadow-lg group-hover:shadow-rose-400/40 group-hover:scale-105 transition-all duration-300 shrink-0">
+              <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full bg-gradient-to-tr from-rose-500 via-rose-400 to-pink-400 p-0.5 flex items-center justify-center shadow-md shadow-rose-400/30 group-hover:shadow-lg group-hover:scale-105 transition-all duration-300 shrink-0">
                 <img
                   src="/SainiVerseTextLogo.png"
                   onError={(e) => {
@@ -178,13 +191,13 @@ export default function Navbar({
                   className="w-full h-full object-cover rounded-full select-none"
                 />
               </div>
-              <div className="flex flex-col justify-center">
+              <div className="flex flex-col justify-center min-w-0">
                 <span
-                  className="font-neonderthaw text-2xl xs:text-3xl sm:text-3xl md:text-4xl lg:text-[40px] leading-none tracking-wider select-none group-hover:drop-shadow-[0_0_8px_rgba(244,63,94,0.35)] transition-all duration-300"
+                  className="font-neonderthaw text-[22px] xs:text-2xl sm:text-3xl md:text-4xl lg:text-[40px] leading-none tracking-wider select-none group-hover:drop-shadow-[0_0_8px_rgba(244,63,94,0.35)] transition-all duration-300"
                   style={{
                     fontFamily: "'Neonderthaw', cursive, sans-serif",
                     color: '#be123c',
-                    WebkitTextStroke: '0.8px #9f1239',
+                    WebkitTextStroke: '0.6px #9f1239',
                     textShadow: '0 0 1px #9f1239, 0 1px 2px rgba(159, 18, 57, 0.4), 0 0 10px rgba(244, 63, 94, 0.35)',
                     fontWeight: 'normal'
                   }}
@@ -192,7 +205,7 @@ export default function Navbar({
                   SainiVerse
                 </span>
                 <span
-                  className="font-arizonia text-[10px] xs:text-xs sm:text-sm lg:text-[16px] tracking-wide -mt-0.5 block select-none truncate max-w-[115px] xs:max-w-[160px] sm:max-w-none group-hover:text-rose-950 transition-colors duration-200"
+                  className="font-arizonia text-[10px] xs:text-[11px] sm:text-xs md:text-sm lg:text-[16px] tracking-wide -mt-0.5 block select-none whitespace-nowrap group-hover:text-rose-950 transition-colors duration-200"
                   style={{
                     fontFamily: "'Arizonia', cursive, serif",
                     color: '#881337',
@@ -244,49 +257,49 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* 3. MIDDLE: Romantic Music Player Pill (Fluidly Responsive Capsule) */}
-          <div className="flex-1 flex items-center justify-center max-w-[130px] xs:max-w-[170px] sm:max-w-xs md:max-w-md lg:max-w-lg mx-1 sm:mx-2 md:mx-4 min-w-0">
+          {/* 3. MIDDLE: Romantic Music Player Pill */}
+          <div className="flex items-center justify-center shrink-0 sm:flex-1 sm:min-w-0 max-w-[50px] xs:max-w-[56px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-md sm:mx-2 md:mx-4 overflow-hidden">
             <button
               type="button"
               onClick={toggleMusic}
-              className="relative w-full inline-flex items-center justify-between gap-1 xs:gap-1.5 sm:gap-2.5 md:gap-3 px-2 xs:px-2.5 sm:px-3.5 md:px-4 py-1 sm:py-1.5 md:py-2 rounded-xl sm:rounded-2xl bg-white/85 hover:bg-white active:scale-[0.99] backdrop-blur-md border border-rose-200/90 hover:border-rose-300/90 text-rose-700 transition-all shadow-xs hover:shadow-md group cursor-pointer"
+              className="relative w-full max-w-full inline-flex items-center justify-between gap-1 xs:gap-1.5 sm:gap-2 md:gap-2.5 px-1.5 xs:px-2 sm:px-3 md:px-3.5 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl bg-white/85 hover:bg-white active:scale-[0.98] backdrop-blur-md border border-rose-200/90 hover:border-rose-300 text-rose-700 transition-all shadow-xs hover:shadow-md group cursor-pointer overflow-hidden min-w-0"
               title={isPlaying ? 'Pause Romantic Melody' : 'Play Romantic Melody'}
             >
               {/* Left: Play / Pause Circular Icon */}
-              <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              <div className="flex items-center shrink-0">
                 <div
-                  className={`w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  className={`w-6 h-6 xs:w-6.5 xs:h-6.5 sm:w-7.5 sm:h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                     isPlaying
                       ? 'bg-gradient-to-tr from-rose-500 via-rose-600 to-pink-500 text-white shadow-md shadow-rose-500/30 scale-105'
                       : 'bg-gradient-to-tr from-rose-100 to-pink-100 text-rose-600 group-hover:from-rose-200 group-hover:to-pink-200 group-hover:scale-105'
                   }`}
                 >
                   {isPlaying ? (
-                    <Pause className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />
+                    <Pause className="w-2.5 h-2.5 xs:w-3 xs:h-3 fill-current" />
                   ) : (
-                    <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current ml-0.5" />
+                    <Play className="w-2.5 h-2.5 xs:w-3 xs:h-3 fill-current ml-0.5" />
                   )}
                 </div>
               </div>
 
-              {/* Center: Track Label & Status (Fluidly adapts: compact on mobile, rich on tablet/desktop) */}
-              <div className="flex flex-col items-start justify-center min-w-0 flex-1 px-0.5 xs:px-1 text-left">
-                <div className="flex items-center gap-1 sm:gap-1.5 w-full">
+              {/* Center: Track Label & Status (Hidden on compact mobile screens, visible on sm+) */}
+              <div className="hidden sm:flex flex-col items-start justify-center min-w-0 flex-1 px-1 text-left overflow-hidden">
+                <div className="flex items-center gap-1 w-full min-w-0 overflow-hidden">
                   <span
-                    className="font-berkshire text-[11px] xs:text-xs sm:text-sm text-rose-950 font-semibold tracking-wide truncate select-none group-hover:text-rose-600 transition-colors"
+                    className="font-berkshire text-xs sm:text-[13px] text-rose-950 font-semibold tracking-wide truncate w-full select-none group-hover:text-rose-600 transition-colors block"
                     style={{ fontFamily: "'Berkshire Swash', cursive, serif" }}
                   >
                     {audio?.navbarTrack?.title || 'Bhalobashar Morshum (ভালবাসার মরশুম) 💕'}
                   </span>
                   <Sparkles className="w-3 h-3 text-rose-400 shrink-0 animate-pulse hidden lg:inline" />
                 </div>
-                <span className="text-[10px] sm:text-[11px] text-rose-600/80 font-medium tracking-wide truncate select-none hidden md:block">
+                <span className="text-[10px] text-rose-600/80 font-medium tracking-wide truncate w-full select-none hidden md:block">
                   {isPlaying ? 'Playing • Romantic Melody ♬' : 'Paused • Click to Play ♬'}
                 </span>
               </div>
 
               {/* Right: Animated Dancing Equalizer Wave (3-bars on mobile, 5-bars on sm+) */}
-              <div className="flex items-center gap-0.5 sm:gap-1 h-4 xs:h-4.5 sm:h-5 px-1 xs:px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-rose-50/90 border border-rose-100 shrink-0">
+              <div className="flex items-center gap-0.5 sm:gap-1 h-3.5 xs:h-4 sm:h-5 px-1 xs:px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md xs:rounded-lg sm:rounded-xl bg-rose-50/90 border border-rose-100 shrink-0">
                 <span
                   className={`w-0.5 rounded-full transition-all duration-300 ${
                     isPlaying ? 'bg-rose-500 music-bar-1' : 'bg-rose-300 h-1.5'
@@ -294,17 +307,17 @@ export default function Navbar({
                 />
                 <span
                   className={`w-0.5 rounded-full transition-all duration-300 ${
-                    isPlaying ? 'bg-pink-500 music-bar-2' : 'bg-pink-300 h-3'
+                    isPlaying ? 'bg-pink-500 music-bar-2' : 'bg-pink-300 h-2.5'
                   }`}
                 />
                 <span
                   className={`w-0.5 rounded-full transition-all duration-300 ${
-                    isPlaying ? 'bg-rose-600 music-bar-3' : 'bg-rose-300 h-2'
+                    isPlaying ? 'bg-rose-600 music-bar-3' : 'bg-rose-300 h-1.5'
                   }`}
                 />
                 <span
                   className={`hidden xs:block w-0.5 rounded-full transition-all duration-300 ${
-                    isPlaying ? 'bg-pink-400 music-bar-4' : 'bg-pink-300 h-3.5'
+                    isPlaying ? 'bg-pink-400 music-bar-4' : 'bg-pink-300 h-3'
                   }`}
                 />
                 <span
@@ -321,7 +334,7 @@ export default function Navbar({
             {/* Home Tab */}
             <button
               onClick={() => handleTabClick('home')}
-              className={`relative z-10 flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-berkshire transition-colors duration-200 ${
+              className={`relative z-10 flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 px-1.5 xs:px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] xs:text-xs sm:text-sm font-berkshire transition-colors duration-200 cursor-pointer ${
                 currentView === 'home' || currentView === 'grid'
                   ? 'text-rose-600 font-bold'
                   : 'text-gray-600 hover:text-gray-900'
@@ -335,14 +348,14 @@ export default function Navbar({
                   transition={{ type: 'spring', bounce: 0.18, duration: 0.35 }}
                 />
               )}
-              <Home className="w-3.5 h-3.5 shrink-0" />
+              <Home className="w-3 h-3 xs:w-3.5 xs:h-3.5 shrink-0" />
               <span>Home</span>
             </button>
 
             {/* About Tab */}
             <button
               onClick={() => handleTabClick('about')}
-              className={`relative z-10 flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-berkshire transition-colors duration-200 ${
+              className={`relative z-10 flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 px-1.5 xs:px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] xs:text-xs sm:text-sm font-berkshire transition-colors duration-200 cursor-pointer ${
                 currentView === 'about'
                   ? 'text-rose-600 font-bold'
                   : 'text-gray-600 hover:text-gray-900'
@@ -356,7 +369,7 @@ export default function Navbar({
                   transition={{ type: 'spring', bounce: 0.18, duration: 0.35 }}
                 />
               )}
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <Sparkles className="w-3 h-3 xs:w-3.5 xs:h-3.5 shrink-0" />
               <span>About</span>
             </button>
           </div>

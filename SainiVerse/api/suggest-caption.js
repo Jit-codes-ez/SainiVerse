@@ -67,23 +67,32 @@ export default async function handler(req, res) {
     const cleanMimeType = mimeType || 'image/jpeg';
 
     const promptText = `
-You are an expert visual descriptive caption generator.
+You are an expert visual descriptive caption generator and bilingual curator.
 
 Task:
-Carefully inspect the image and generate 4 detailed, context-accurate captions based strictly on what is visually depicted.
+Inspect the provided image and generate exactly 4 ultra-short, context-accurate captions directly anchored to visible visual details (clothing, exact colors, setting, mood, or objects).
 
-Output 4 captions following these distinct styles:
-1. Detailed Visual Breakdown: 1–2 descriptive sentences accurately detailing the core subject, layout, colors, shapes, symbols, and artistic elements in the image.
-2. Conceptual & Metaphorical: An expressive reflection on the deeper meaning, design philosophy, or atmosphere conveyed by the image.
-3. Creative & Contextual: A thoughtful caption tailored to the medium (e.g., if it is technical/graphic/branding art, highlight the analytical design and growth symbolism; if it is a photograph, capture the genuine atmosphere).
-4. Poetic Bengali Expression: A natural, meaningful Bengali line (in Bengali script) capturing the essence of the visual subject, followed by a soft English translation in parentheses.
+Caption Styles (One of each):
+1. Visual Breakdown: Short phrase noting the core visual subject, outfit, or color.
+2. Conceptual Vibe: A snappy reflection on the atmosphere or mood of the scene.
+3. Sassy / Creative: A playful, stylish one-liner matching the exact activity or pose.
+4. Poetic Bengali Expression: A short line in Bengali script (বাংলা) followed by a short English translation in parentheses.
 
-Strict Rules:
-- Base the descriptions completely on what is actually shown in the image.
-- Do NOT mention names like "Jit", "Saini", or "SainiVerse" unless those exact words are visibly written inside the graphic or text of the image.
-- Do NOT invent or force romantic relationship narratives if the image is an emblem, graphic, logo, diagram, or object.
-- Return ONLY a valid JSON array containing exactly 4 strings without markdown code blocks or backticks.
-`;
+Strict Length & Grounding Rules:
+- LENGTH: 5 to 6 words preferred. Maximum 10 words total per caption.
+- Base every caption strictly on what is physically visible in the image.
+- Include 1 to 2 fitting emojis at the end of each caption.
+- Do NOT mention names like "Jit", "Saini", or "SainiVerse" unless visibly printed in the image.
+- Do NOT force couple/romantic lines onto non-romantic images (logos, objects, slides, scenery).
+- Return ONLY a valid JSON array of 4 strings. No markdown fences, backticks, or extra text.
+
+Example Output:
+[
+  "Classic red saree, timeless grace. ✨",
+  "Warm daylight and golden hour charm. ☀️💛",
+  "Effortless elegance in every single frame. 💃✨",
+  "এক চিলতে মিষ্টি হাসি আর আলো। (A sweet smile and gentle light.) 🌸"
+]`
 
     const ai = new GoogleGenAI({ apiKey });
 

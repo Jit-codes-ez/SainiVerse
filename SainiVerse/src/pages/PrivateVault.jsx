@@ -109,6 +109,7 @@ export default function PrivateVault() {
   }, [currentUser, isAuthChecking, navigate]);
 
   const currentUserEmail = currentUser?.email || auth?.currentUser?.email || 'Couple Sanctuary';
+  const isCurrentPartnerSaini = currentUserEmail.toLowerCase().includes('saini');
 
   // Active Gallery Filter ('all' | 'private' | 'public')
   const [galleryTab, setGalleryTab] = useState('all');

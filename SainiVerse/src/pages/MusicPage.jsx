@@ -113,9 +113,9 @@ export default function MusicPage() {
             animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-rose-200 text-rose-700 text-xs font-semibold shadow-xs"
           >
-            <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+            <Radio className="w-3.5 h-3.5 text-rose-500 fill-rose-500 animate-ping shrink-0" />
             <span>Celestial Melody Sanctuary</span>
-            <Sparkles className="w-3 h-3 text-amber-500" />
+            <Radio className="w-3.5 h-3.5 text-rose-500 fill-rose-500 animate-ping shrink-0" />
           </motion.div>
 
           <motion.h1

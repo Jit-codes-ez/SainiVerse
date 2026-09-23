@@ -1,24 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { calculateDaysTogether } from '../utils/dateUtils';
-import { HER_BIRTHDAY, OUR_ANNIVERSARY } from '../utils/specialDates';
+import { HER_BIRTHDAY} from '../utils/specialDates';
 import { CardGlare} from '../components/CardGlare';
 import { useVault } from '../context/VaultContext';
 import {
   Heart,
   Sparkles,
-  Calendar,
   Clock,
   ArrowLeft,
   Stars,
   PartyPopper,
   Flame,
-  Hourglass,
   Gift,
-  Smile,
-  Compass,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -113,7 +109,7 @@ export default function Coundown() {
 
     const diff = calculateTimeRemaining(nextBirthday);
 
-    const envBirthYear = import.meta.env.VITE_HER_BIRTH_YEAR || HER_BIRTHDAY.birthYear || 2003;
+    const envBirthYear = import.meta.env.VITE_HER_BIRTH_YEAR || HER_BIRTHDAY.birthYear || 2005;
     const birthYear = Number(envBirthYear);
     const targetAge = nextBirthday.getFullYear() - birthYear;
 

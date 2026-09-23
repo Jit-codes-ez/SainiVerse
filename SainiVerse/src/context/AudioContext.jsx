@@ -173,6 +173,12 @@ export function AudioProvider({ children }) {
   const startNavbarPlayback = useCallback(() => {
     if (!navbarAudioRef.current || isNavbarManuallyPausedRef.current) return;
 
+    // Ensure vault music player is not playing
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+
     navbarAudioRef.current
       .play()
       .then(() => {

@@ -2,11 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { subscribeToMemories, saveDemoMemory, deleteMemory } from '../utils/memoryStorage';
 import { isFirebaseConfigured } from '../firebase';
 import { checkSpecialOccasion } from '../utils/specialDates';
-import { useAudio } from './AudioContext';
 
 const VaultContext = createContext(null);
 const STORAGE_KEYS = {
   VISITOR_ROLE: 'sainiverse_visitor_role',
+  HAS_VISITED: 'sainiverse_has_visited',
 };
 const DEFAULT_ROLE = 'girlfriend';
 
@@ -16,15 +16,68 @@ export const defaultCoupleUser = {
   uid: 'couple_vault_admin',
 };
 
-export function VaultProvider({ children, user = defaultCoupleUser }) {
-  const { startPlayback, isManuallyPausedRef } = useAudio();
+/**
+ * Determines whether the opening modals (WelcomeModal & SpecialOccasionModal) should display.
+ * - Always shows on the user's first time visit to the site.
+ * - On page refresh/reload, strictly shows ONLY on Home page ('/').
+ * - On other pages (/countdown, /music, /memories, etc.), page refresh will NOT show the opening modals.
+ */
+function checkShouldShowEntryPopup() {
+  if (typeof window === 'undefined') return false;
 
+  // Determine current route path
+  const rawPath = window.location.pathname || '';
+  const cleanPath = rawPath.replace(/\/+$/, '');
+  const isHomePage = cleanPath === '' || cleanPath === '/';
+
+  // Check if current action is a page refresh / reload
+  let isPageReload = false;
+  try {
+    const navEntries = performance.getEntriesByType?.('navigation');
+    if (navEntries && navEntries.length > 0) {
+      isPageReload = navEntries[0].type === 'reload';
+    } else if (window.performance?.navigation) {
+      isPageReload = window.performance.navigation.type === 1; // TYPE_RELOAD
+    }
+  } catch {
+    isPageReload = false;
+  }
+
+  // Check if visitor has visited the site before
+  let hasVisitedBefore = false;
+  try {
+    hasVisitedBefore = Boolean(
+      localStorage.getItem(STORAGE_KEYS.HAS_VISITED) ||
+      sessionStorage.getItem('sainiverse_session_active')
+    );
+  } catch {
+    hasVisitedBefore = false;
+  }
+
+  // Rule 1: If on a page refresh/reload:
+  // ONLY show on Home page ('/'). On other pages, do NOT show.
+  if (isPageReload) {
+    return isHomePage;
+  }
+
+  // Rule 2: If first time visiting the site (new visitor):
+  // Always show opening modals to welcome the visitor.
+  if (!hasVisitedBefore) {
+    return true;
+  }
+
+  // Rule 3: For returning visits, show if landing on Home page
+  return isHomePage;
+}
+
+export function VaultProvider({ children, user = defaultCoupleUser }) {
+  const [initialShouldShow] = useState(() => checkShouldShowEntryPopup());
   const [memories, setMemories] = useState([]);
   const [isLoadingMemories, setIsLoadingMemories] = useState(true);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [notification, setNotification] = useState('');
-  const [showEntryPopup, setShowEntryPopup] = useState(true);
+  const [showEntryPopup, setShowEntryPopup] = useState(initialShouldShow);
   const [activeOccasion, setActiveOccasion] = useState(null);
 
   const toastTimerRef = useRef(null);
@@ -145,33 +198,40 @@ export function VaultProvider({ children, user = defaultCoupleUser }) {
     [showNotification]
   );
 
-  const hasSeenOccasionRef = useRef(false);
+  const hasSeenOccasionRef = useRef(!initialShouldShow);
 
   // Dismiss entry popup and check for occasion
   const handleDismissEntry = useCallback(() => {
     setShowEntryPopup(false);
-    if (!isManuallyPausedRef.current) {
-      startPlayback();
+    try {
+      localStorage.setItem(STORAGE_KEYS.HAS_VISITED, 'true');
+      sessionStorage.setItem('sainiverse_session_active', 'true');
+    } catch {
+      // Ignore storage errors
     }
+
     const occasion = checkSpecialOccasion();
     if (occasion) {
       setTimeout(() => {
         hasSeenOccasionRef.current = true;
         setActiveOccasion(occasion);
       }, 120);
+    } else {
+      hasSeenOccasionRef.current = true;
     }
-  }, [startPlayback, isManuallyPausedRef]);
+  }, []);
 
   // Secondary occasion check if entry popup was already dismissed
+  // Only runs if opening modals were originally active for this visit/refresh
   useEffect(() => {
-    if (!showEntryPopup && !hasSeenOccasionRef.current && !activeOccasion) {
+    if (initialShouldShow && !showEntryPopup && !hasSeenOccasionRef.current && !activeOccasion) {
       const occasion = checkSpecialOccasion();
       if (occasion) {
         hasSeenOccasionRef.current = true;
         setActiveOccasion(occasion);
       }
     }
-  }, [showEntryPopup, activeOccasion]);
+  }, [initialShouldShow, showEntryPopup, activeOccasion]);
 
   const openOccasion = useCallback((occasionType) => {
     setActiveOccasion(occasionType);
