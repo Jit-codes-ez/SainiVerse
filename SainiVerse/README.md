@@ -4,10 +4,9 @@
 
 <div align="center">
 
-# SainiVerse — Our Private Cosmic Memory Vault
+# SainiVerse — Curated memories, endless orbit
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-sainiverse.vercel.app-ff69b4?style=for-the-badge&logoColor=white)](https://sainiverse.vercel.app)
-[![Zero Knowledge Security](https://img.shields.io/badge/🛡️_Security-Level_4_ZK-000000?style=for-the-badge&logo=shield&logoColor=white)](https://sainiverse.vercel.app)
 
 </div>
 
