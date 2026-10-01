@@ -92,6 +92,24 @@ function apiDevMiddleware() {
             });
             return;
           }
+
+          if (pathname === '/api/love-meter') {
+            const { default: handler } = await server.ssrLoadModule('/api/love-meter.js');
+            if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+              return await handler(req, res);
+            }
+            let bodyStr = '';
+            req.on('data', (chunk) => (bodyStr += chunk));
+            req.on('end', async () => {
+              try {
+                req.body = bodyStr ? JSON.parse(bodyStr) : {};
+              } catch {
+                req.body = bodyStr;
+              }
+              await handler(req, res);
+            });
+            return;
+          }
         } catch (err) {
           console.error('API Dev Middleware Error:', err);
           res.statusCode = 500;

@@ -31,6 +31,11 @@ service cloud.firestore {
       allow create, update, delete: if isCoupleMember();
     }
 
+    // Public Stats (e.g. global Love Meter counter)
+    match /Public_Stats/{statId} {
+      allow read, write: if true;
+    }
+
     // Strict deny-all fallback for any other collection or document
     match /{document=**} {
       allow read, write: if false;
