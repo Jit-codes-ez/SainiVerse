@@ -5,41 +5,45 @@ import { Heart, Sparkles } from 'lucide-react';
 const STORAGE_KEY = 'sainiverse_global_love_count';
 
 export default function GuestLoveWidget({ visitorRole }) {
-  const [loveCount, setLoveCount] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached !== null) {
-        const parsed = parseInt(cached, 10);
-        if (!isNaN(parsed) && parsed >= 0) return parsed;
-      }
-    }
-    return 0; // Starts strictly from 0
-  });
-
+  const [loveCount, setLoveCount] = useState(0);
   const [hasSent, setHasSent] = useState(false);
-  const countRef = useRef(loveCount);
-  countRef.current = loveCount;
+
+  // Track ongoing in-flight user taps
+  const inFlightTapsRef = useRef(0);
 
   // Synchronize global count from server on mount and keep updated
   useEffect(() => {
     let isMounted = true;
 
+    // Clean up old legacy keys that may contain stale demo counts
+    try {
+      localStorage.removeItem('sainiverse_guest_love_count');
+      localStorage.removeItem('sainiverse_love_meter_count');
+    } catch {
+      // Ignore
+    }
+
     const fetchGlobalCount = async () => {
       try {
-        const res = await fetch('/api/love-meter');
+        const res = await fetch(`/api/love-meter?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        });
         if (res.ok) {
           const data = await res.json();
           if (isMounted && typeof data.count === 'number') {
-            // Keep count monotonic to avoid downgrading during rapid taps
-            setLoveCount((prev) => {
-              const updated = Math.max(prev, data.count);
+            // Authoritative server sync: Only update if no local taps are currently in flight
+            if (inFlightTapsRef.current === 0) {
+              setLoveCount(data.count);
               try {
-                localStorage.setItem(STORAGE_KEY, String(updated));
+                localStorage.setItem(STORAGE_KEY, String(data.count));
               } catch {
                 // Ignore storage error
               }
-              return updated;
-            });
+            }
           }
         }
       } catch (err) {
@@ -50,12 +54,12 @@ export default function GuestLoveWidget({ visitorRole }) {
     // Initial fetch on mount
     fetchGlobalCount();
 
-    // Periodic polling so all users worldwide see real-time updates
+    // Periodic polling (every 5 seconds) so all users see real-time updates
     const intervalId = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchGlobalCount();
       }
-    }, 8000);
+    }, 5000);
 
     // Re-sync whenever the user switches back to this tab
     const handleFocus = () => fetchGlobalCount();
@@ -71,14 +75,9 @@ export default function GuestLoveWidget({ visitorRole }) {
   }, []);
 
   const handleSendLove = async () => {
-    // 1. Instant optimistic UI increment (+1)
-    const nextCount = countRef.current + 1;
-    setLoveCount(nextCount);
-    try {
-      localStorage.setItem(STORAGE_KEY, String(nextCount));
-    } catch {
-      // Ignore
-    }
+    // 1. Increment in-flight tap counter and update UI optimistically
+    inFlightTapsRef.current += 1;
+    setLoveCount((prev) => prev + 1);
     setHasSent(true);
 
     // 2. Celebratory Confetti Burst
@@ -101,18 +100,20 @@ export default function GuestLoveWidget({ visitorRole }) {
       if (res.ok) {
         const data = await res.json();
         if (typeof data.count === 'number') {
-          setLoveCount((prev) => {
-            const updated = Math.max(prev, data.count);
-            try {
-              localStorage.setItem(STORAGE_KEY, String(updated));
-            } catch {
-              // Ignore
-            }
-            return updated;
-          });
+          inFlightTapsRef.current = Math.max(0, inFlightTapsRef.current - 1);
+          const targetCount = data.count + inFlightTapsRef.current;
+          setLoveCount(targetCount);
+          try {
+            localStorage.setItem(STORAGE_KEY, String(targetCount));
+          } catch {
+            // Ignore
+          }
         }
+      } else {
+        inFlightTapsRef.current = Math.max(0, inFlightTapsRef.current - 1);
       }
     } catch (err) {
+      inFlightTapsRef.current = Math.max(0, inFlightTapsRef.current - 1);
       console.warn('[LoveMeter] Network increment note:', err?.message || err);
     }
   };
