@@ -82,32 +82,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Authorization check for private files or if authorization header is provided
-    const isPrivate =
-      key.startsWith('Private_Memories/') ||
-      key.startsWith('Private_Memory/') ||
-      key.startsWith('Music/');
-
+    // 4. Strict Authorization: Only authenticated couple accounts can delete files
     const authHeader = req.headers?.authorization || req.headers?.Authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const authResult = await verifyAuthorization(req);
-      if (!authResult.authorized) {
-        return sendJson(res, authResult.statusCode || 401, {
-          error: authResult.error || 'Unauthorized: Valid Firebase session token required.',
-        });
-      }
-    } else if (isPrivate) {
-      // In production, strictly enforce token for private assets. In dev mode, allow testing.
-      if (process.env.NODE_ENV === 'production') {
-        const authResult = await verifyAuthorization(req);
-        if (!authResult.authorized) {
-          return sendJson(res, authResult.statusCode || 401, {
-            error: authResult.error || 'Unauthorized: Session token required to delete private file.',
-          });
-        }
-      } else {
-        console.log(`[api/delete-file] Dev mode: proceeding with deletion of ${key} without token.`);
-      }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return sendJson(res, 401, {
+        error: 'Unauthorized: Valid Firebase session token required to delete files.',
+      });
+    }
+
+    const authResult = await verifyAuthorization(req);
+    if (!authResult.authorized) {
+      return sendJson(res, authResult.statusCode || 401, {
+        error: authResult.error || 'Unauthorized: Only logged-in couple members can delete files.',
+      });
     }
 
     // 5. Execute DeleteObjectCommand in Cloudflare R2

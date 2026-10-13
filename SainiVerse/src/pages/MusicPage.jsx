@@ -23,6 +23,8 @@ import {
   Radio,
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { useVault } from '../context/VaultContext';
+import { auth } from '../firebase';
 import { deleteSongFromFirestore } from '../utils/musicStorage';
 
 function formatDuration(seconds) {
@@ -59,6 +61,10 @@ export default function MusicPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUploaderFilter, setSelectedUploaderFilter] = useState('all'); // 'all' | 'jit' | 'saini'
 
+  // Auth state for administrative actions
+  const { isLoggedIn } = useVault();
+  const canDelete = Boolean(isLoggedIn || auth?.currentUser);
+
   // Delete Confirmation State
   const [songToDelete, setSongToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -73,19 +79,18 @@ export default function MusicPage() {
         (track.artist || '').toLowerCase().includes(q) ||
         (track.dedication || '').toLowerCase().includes(q);
 
+      const uploaderLower = (track.uploaderName || '').toLowerCase();
       const matchUploader =
         selectedUploaderFilter === 'all' ||
-        (selectedUploaderFilter === 'jit' &&
-          (track.uploaderName || '').toLowerCase().includes('jit')) ||
-        (selectedUploaderFilter === 'saini' &&
-          (track.uploaderName || '').toLowerCase().includes('saini'));
+        (selectedUploaderFilter === 'jit' && (uploaderLower.includes('jit') || !uploaderLower.includes('saini'))) ||
+        (selectedUploaderFilter === 'saini' && uploaderLower.includes('saini'));
 
       return matchSearch && matchUploader;
     });
   }, [playlist, searchQuery, selectedUploaderFilter]);
 
   const handleConfirmDelete = async () => {
-    if (!songToDelete) return;
+    if (!songToDelete || !canDelete) return;
     try {
       setIsDeleting(true);
       await deleteSongFromFirestore(songToDelete);
@@ -229,12 +234,10 @@ export default function MusicPage() {
                     <Music className="w-3 h-3" />
                     <span>{hasMusic ? 'Now Orbiting' : 'Vault Quiet'}</span>
                   </span>
-                  {currentTrack?.uploaderName && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-700 text-[11px] font-medium border border-pink-200/70 inline-flex items-center gap-1">
-                      <User className="w-2.5 h-2.5" />
-                      <span>Added by {currentTrack.uploaderName}</span>
-                    </span>
-                  )}
+                  <span className="px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-700 text-[11px] font-medium border border-pink-200/70 inline-flex items-center gap-1">
+                    <User className="w-2.5 h-2.5" />
+                    <span>Added by {currentTrack?.uploaderName && currentTrack.uploaderName !== 'Partner' ? currentTrack.uploaderName : 'Jit'}</span>
+                  </span>
                 </div>
 
                 <span className="text-xs text-rose-500 font-semibold">
@@ -252,20 +255,19 @@ export default function MusicPage() {
                   className="text-2xl sm:text-3xl font-bold font-berkshire text-rose-950 tracking-wide line-clamp-2"
                   style={{ fontFamily: "'Berkshire Swash', cursive, serif" }}
                 >
-                  {hasMusic
-                    ? currentTrack?.title || 'Unknown Melody'
-                    : 'No Musics Found'}
+                  {hasMusic ? (
+                    <>
+                      <span>{currentTrack?.title || 'Unknown Melody'}</span>
+                    </>
+                  ) : (
+                    'No Musics Found'
+                  )}
                 </h2>
                 <p className="text-sm font-semibold text-rose-600 tracking-wide">
                   {hasMusic
-                    ? currentTrack?.artist || 'Custom Vault Melody'
+                    ? (currentTrack?.artist ? `${currentTrack.artist}` : 'Custom Vault Melody')
                     : 'Upload songs from the Private Section to begin playback'}
                 </p>
-                {currentTrack?.dedication && (
-                  <p className="text-xs text-gray-600 italic bg-rose-50/80 p-2.5 rounded-xl border border-rose-100/90 leading-relaxed">
-                    "{currentTrack.dedication}"
-                  </p>
-                )}
               </div>
 
               {/* Scrubber / Seek Bar with Timers */}
@@ -404,7 +406,7 @@ export default function MusicPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search songs, artists, or dedications..."
+                placeholder="Search songs, artists ..."
                 className="w-full pl-9 pr-4 py-2 rounded-xl bg-white border border-rose-100 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-rose-400"
               />
               {searchQuery && (
@@ -513,7 +515,7 @@ export default function MusicPage() {
 
                       {/* Song Information */}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4
                             className={`text-sm font-semibold truncate transition-colors ${
                               isThisTrackActive
@@ -521,7 +523,12 @@ export default function MusicPage() {
                                 : 'text-gray-900 group-hover:text-rose-600'
                             }`}
                           >
-                            {song.title}
+                            <span>{song.title}</span>
+                            {song.artist && (
+                              <span className="font-normal text-gray-500 text-xs ml-1.5">
+                                • {song.artist}
+                              </span>
+                            )}
                           </h4>
                           {isThisTrackActive && (
                             <span className="px-2 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-bold shrink-0">
@@ -530,45 +537,36 @@ export default function MusicPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500">
-                          <span className="font-medium text-gray-700">{song.artist}</span>
-                          {song.dedication && (
-                            <>
-                              <span>•</span>
-                              <span className="italic truncate max-w-[200px] sm:max-w-xs text-rose-600/80">
-                                "{song.dedication}"
-                              </span>
-                            </>
-                          )}
+                          <span className="inline-flex items-center gap-1 font-semibold text-rose-600">
+                            <User className="w-3 h-3 text-rose-500" />
+                            <span>Uploaded by {song.uploaderName && song.uploaderName !== 'Partner' ? song.uploaderName : 'Jit'}</span>
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Right: Meta & Actions */}
-                    <div className="flex items-center gap-3 shrink-0">
-                      {song.uploaderName && (
-                        <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200/60 text-[10px] font-semibold text-rose-700">
-                          {song.uploaderName}
-                        </span>
-                      )}
-
+                    <div className="flex items-center gap-2 xs:gap-3 shrink-0">
                       {song.duration && (
                         <span className="text-xs font-mono text-gray-500">
                           {formatDuration(song.duration)}
                         </span>
                       )}
 
-                      {/* Delete Action */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSongToDelete(song);
-                        }}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Delete from playlist"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Delete Action (strictly restricted to logged-in couple members) */}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSongToDelete(song);
+                          }}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Delete from playlist"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -580,7 +578,7 @@ export default function MusicPage() {
 
       {/* 4. DELETE CONFIRMATION MODAL */}
       <AnimatePresence>
-        {songToDelete && (
+        {songToDelete && canDelete && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}

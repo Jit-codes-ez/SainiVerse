@@ -96,7 +96,7 @@ export default function Navbar({
   });
 
   const daysInfo = calculateDaysTogether();
-  const coupleNames = import.meta.env.VITE_COUPLE_NAMES || 'Jith & Her';
+  const coupleNames = import.meta.env.VITE_COUPLE_NAMES || 'Jit & Her';
 
   // Toggle romantic background music
   const toggleMusic = () => {
@@ -196,24 +196,12 @@ export default function Navbar({
                   className="font-neonderthaw text-[22px] xs:text-2xl sm:text-3xl md:text-4xl lg:text-[40px] leading-none tracking-wider select-none group-hover:drop-shadow-[0_0_8px_rgba(244,63,94,0.35)] transition-all duration-300"
                   style={{
                     fontFamily: "'Neonderthaw', cursive, sans-serif",
-                    color: '#be123c',
-                    WebkitTextStroke: '0.6px #9f1239',
-                    textShadow: '0 0 1px #9f1239, 0 1px 2px rgba(159, 18, 57, 0.4), 0 0 10px rgba(244, 63, 94, 0.35)',
+                    color: '#f53f6cff',
+                    WebkitTextStroke: '0.6px #ed3b6eff',
                     fontWeight: 'normal'
                   }}
                 >
                   SainiVerse
-                </span>
-                <span
-                  className="font-arizonia text-[10px] xs:text-[11px] sm:text-xs md:text-sm lg:text-[16px] tracking-wide -mt-0.5 block select-none whitespace-nowrap group-hover:text-rose-950 transition-colors duration-200"
-                  style={{
-                    fontFamily: "'Arizonia', cursive, serif",
-                    color: '#881337',
-                    WebkitTextStroke: '0.2px #881337',
-                    textShadow: '0 1px 1px rgba(255, 255, 255, 0.9)'
-                  }}
-                >
-                  Curated memories, endless orbit
                 </span>
               </div>
             </button>

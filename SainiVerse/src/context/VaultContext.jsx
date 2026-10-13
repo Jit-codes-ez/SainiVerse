@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { subscribeToMemories, saveDemoMemory, deleteMemory } from '../utils/memoryStorage';
-import { isFirebaseConfigured } from '../firebase';
+import { isFirebaseConfigured, auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { checkSpecialOccasion } from '../utils/specialDates';
 
 const VaultContext = createContext(null);
@@ -11,8 +12,8 @@ const STORAGE_KEYS = {
 const DEFAULT_ROLE = 'girlfriend';
 
 export const defaultCoupleUser = {
-  email: 'jith@sainiverse.internal',
-  displayName: 'Jith & Her',
+  email: 'Jit@sainiverse.internal',
+  displayName: 'Jit & Her',
   uid: 'couple_vault_admin',
 };
 
@@ -70,10 +71,24 @@ function checkShouldShowEntryPopup() {
   return isHomePage;
 }
 
-export function VaultProvider({ children, user = defaultCoupleUser }) {
+export function VaultProvider({ children, user: initialUser = null }) {
+  const [currentUser, setCurrentUser] = useState(() => auth?.currentUser || initialUser);
   const [initialShouldShow] = useState(() => checkShouldShowEntryPopup());
   const [memories, setMemories] = useState([]);
   const [isLoadingMemories, setIsLoadingMemories] = useState(true);
+
+  // Synchronize live Firebase authentication state
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  const isLoggedIn = Boolean(currentUser);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [notification, setNotification] = useState('');
@@ -166,10 +181,15 @@ export function VaultProvider({ children, user = defaultCoupleUser }) {
     [showNotification]
   );
 
-  // Memory deletion
+  // Memory deletion (restricted strictly to authenticated users)
   const handleDeleteMemory = useCallback(
     async (memory) => {
       if (!memory) return;
+
+      if (!auth?.currentUser) {
+        showNotification('Access restricted: Only logged-in users can delete photos.', 3500);
+        return;
+      }
 
       const memId = memory.id;
       const memKey = memory.storageKey || memory.storagePath;
@@ -245,7 +265,9 @@ export function VaultProvider({ children, user = defaultCoupleUser }) {
   return (
     <VaultContext.Provider
       value={{
-        user,
+        user: currentUser,
+        currentUser,
+        isLoggedIn,
         memories,
         isLoadingMemories,
         visitorRole,

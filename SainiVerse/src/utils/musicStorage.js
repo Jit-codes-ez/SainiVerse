@@ -1,5 +1,6 @@
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db, auth, isFirebaseConfigured } from '../firebase';
+import { logVaultAction } from './activityLogger';
 
 /**
  * Trigger an application-wide music re-sync event
@@ -66,12 +67,44 @@ export function subscribeMusic(callback) {
   const emitMerged = () => {
     if (!isMounted) return;
 
-    // Index firestore metadata by storageKey or id
+    // Index firestore metadata by storageKey, storagePath, id, and fileName
     const firestoreByKey = new Map();
     firestoreSongs.forEach((song) => {
       if (song.storageKey) firestoreByKey.set(song.storageKey, song);
+      if (song.storagePath) firestoreByKey.set(song.storagePath, song);
       if (song.id) firestoreByKey.set(song.id, song);
+      if (song.fileName) firestoreByKey.set(song.fileName, song);
     });
+
+    const findSongMetadata = (r2) => {
+      if (!r2) return {};
+      if (r2.storageKey && firestoreByKey.has(r2.storageKey)) return firestoreByKey.get(r2.storageKey);
+      if (r2.fileName && firestoreByKey.has(r2.fileName)) return firestoreByKey.get(r2.fileName);
+      if (r2.id && firestoreByKey.has(r2.id)) return firestoreByKey.get(r2.id);
+
+      const normR2Key = (r2.storageKey || '').toLowerCase().replace(/_/g, ' ').replace(/^\/+/, '');
+      const r2Uuid = (r2.storageKey || '').match(/[a-f0-9-]{36}/i)?.[0]?.toLowerCase();
+
+      for (const f of firestoreSongs) {
+        const normFKey = (f.storageKey || f.storagePath || '').toLowerCase().replace(/_/g, ' ').replace(/^\/+/, '');
+        if (normFKey && normFKey === normR2Key) return f;
+
+        // Match by UUID (stripping 'music_' prefix from Firestore doc id)
+        const fUuid = (f.id || '').replace(/^music_/, '').toLowerCase();
+        if (fUuid && (normR2Key.includes(fUuid) || (r2Uuid && r2Uuid === fUuid))) return f;
+
+        // Match by normalized filename (e.g. 'Majhe Majhe Tobo.mp3' vs 'Majhe_Majhe_Tobo.mp3')
+        const fNormName = (f.fileName || '').toLowerCase().replace(/_/g, ' ');
+        const r2NormName = (r2.fileName || '').toLowerCase().replace(/_/g, ' ');
+        if (fNormName && r2NormName && (fNormName === r2NormName || normR2Key.endsWith(fNormName))) return f;
+
+        // Match by normalized title
+        const fNormTitle = (f.title || '').toLowerCase().replace(/_/g, ' ').trim();
+        const r2NormTitle = (r2.title || '').toLowerCase().replace(/_/g, ' ').trim();
+        if (fNormTitle && r2NormTitle && fNormTitle === r2NormTitle) return f;
+      }
+      return {};
+    };
 
     // Merge R2 songs with any matching Firestore metadata
     const mergedList = [];
@@ -79,16 +112,27 @@ export function subscribeMusic(callback) {
 
     r2Songs.forEach((r2Item) => {
       if (isSongDeleted(r2Item)) return;
-      const metadata = firestoreByKey.get(r2Item.storageKey) || {};
+      const metadata = findSongMetadata(r2Item);
       if (metadata.id) matchedFirestoreIds.add(metadata.id);
+
+      const rawUploader = (metadata.uploaderName || r2Item.uploaderName || '').trim();
+      const email = (metadata.uploaderEmail || '').toLowerCase();
+      let finalUploader = 'Jit';
+      if (rawUploader && rawUploader !== 'Partner' && rawUploader !== 'Her' && rawUploader !== 'Vault') {
+        finalUploader = rawUploader;
+      } else if (email.includes('saini')) {
+        finalUploader = 'Saini';
+      } else if (email.includes('jit')) {
+        finalUploader = 'Jit';
+      }
 
       mergedList.push({
         id: metadata.id || r2Item.id,
         title: metadata.title || r2Item.title,
-        artist: metadata.artist || r2Item.artist,
-        dedication: metadata.dedication || r2Item.dedication,
-        uploaderName: metadata.uploaderName || 'Partner',
-        uploaderEmail: metadata.uploaderEmail || '',
+        artist: metadata.artist || (r2Item.artist && r2Item.artist !== 'Vault Melody' ? r2Item.artist : '') || '',
+        dedication: metadata.dedication || r2Item.dedication || 'Our celestial melody in endless orbit',
+        uploaderName: finalUploader,
+        uploaderEmail: metadata.uploaderEmail || (finalUploader === 'Jit' ? 'hers.jit@gmail.com' : 'his.saini.gulu@gmail.com'),
         storageKey: r2Item.storageKey,
         fileName: r2Item.fileName,
         size: r2Item.size,
@@ -103,8 +147,18 @@ export function subscribeMusic(callback) {
     firestoreSongs.forEach((fSong) => {
       if (isSongDeleted(fSong)) return;
       if (!matchedFirestoreIds.has(fSong.id) && fSong.storageKey?.startsWith('Music/')) {
+        const rawUploader = (fSong.uploaderName || '').trim();
+        const email = (fSong.uploaderEmail || '').toLowerCase();
+        let finalUploader = 'Jit';
+        if (rawUploader && rawUploader !== 'Partner' && rawUploader !== 'Her') {
+          finalUploader = rawUploader;
+        } else if (email.includes('saini')) {
+          finalUploader = 'Saini';
+        }
+
         mergedList.push({
           ...fSong,
+          uploaderName: finalUploader,
           url: `/api/get-music?key=${encodeURIComponent(fSong.storageKey)}`,
         });
       }
@@ -116,10 +170,28 @@ export function subscribeMusic(callback) {
   };
 
   const loadR2 = async () => {
-    const list = await fetchR2Songs();
-    if (isMounted) {
-      r2Songs = list;
-      emitMerged();
+    try {
+      const [list, fsMusicSnap] = await Promise.all([
+        fetchR2Songs(),
+        isFirebaseConfigured && db
+          ? getDocs(collection(db, 'Music_Details')).catch((err) => {
+              console.warn('[musicStorage] Firestore Music_Details query notice:', err.message);
+              return null;
+            })
+          : null,
+      ]);
+      if (isMounted) {
+        r2Songs = list;
+        if (fsMusicSnap && Array.isArray(fsMusicSnap.docs) && fsMusicSnap.docs.length > 0) {
+          firestoreSongs = fsMusicSnap.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }));
+        }
+        emitMerged();
+      }
+    } catch (e) {
+      console.warn('[musicStorage] Error loading songs:', e);
     }
   };
 
@@ -148,6 +220,11 @@ export function subscribeMusic(callback) {
         },
         (err) => {
           console.warn('[musicStorage] Firestore Music_Details listener notice:', err.message);
+          if (err.code === 'permission-denied') {
+            console.error(
+              '[musicStorage] Firestore permission denied for "Music_Details". Ensure `match /Music_Details/{songId} { allow read: if true; }` is published in Firebase Console -> Firestore Database -> Rules.'
+            );
+          }
         }
       );
     } catch (e) {
@@ -256,9 +333,9 @@ export async function uploadMusicToR2AndFirestore({
   const songMetadata = {
     id: songId,
     title: (title || file.name.replace(/\.[^/.]+$/, '')).trim(),
-    artist: (artist || 'Custom Vault Melody').trim(),
+    artist: (artist || '').trim(),
     dedication: (dedication || 'For Saini & Jit').trim(),
-    uploaderName: uploaderName || 'Partner',
+    uploaderName: uploaderName && uploaderName !== 'Partner' ? uploaderName : (auth.currentUser?.email?.toLowerCase().includes('saini') ? 'Saini' : 'Jit'),
     uploaderEmail: auth.currentUser?.email || '',
     storageKey: key,
     fileName: file.name,
@@ -278,6 +355,25 @@ export async function uploadMusicToR2AndFirestore({
     }
   }
 
+  // Record action in Activity Logs
+  try {
+    await logVaultAction({
+      action: 'add',
+      type: 'song',
+      title: songMetadata.title,
+      category: 'music',
+      details: {
+        artist: songMetadata.artist,
+        fileName: songMetadata.fileName,
+        size: songMetadata.size,
+      },
+      userEmail: songMetadata.uploaderEmail,
+      userName: songMetadata.uploaderName,
+    });
+  } catch (logErr) {
+    console.warn('[musicStorage] Notice logging upload action:', logErr);
+  }
+
   onProgress(100);
   triggerMusicRefresh();
   return songMetadata;
@@ -290,6 +386,10 @@ export async function uploadMusicToR2AndFirestore({
  */
 export async function deleteSongFromFirestore(songOrId, optionalStorageKey) {
   if (!songOrId) return;
+
+  if (!auth?.currentUser) {
+    throw new Error('Unauthorized: Authentication required to delete songs.');
+  }
 
   // Immediately record as deleted in session blacklist and fire UI refresh
   markSongAsDeleted(songOrId, optionalStorageKey);
@@ -366,6 +466,32 @@ export async function deleteSongFromFirestore(songOrId, optionalStorageKey) {
         console.warn('[musicStorage] Note cleaning Music_Details by storageKey:', err);
       }
     }
+  }
+
+  // Record action in Activity Logs
+  try {
+    const songName =
+      (typeof songOrId === 'object' ? songOrId?.title : null) ||
+      (storageKey ? storageKey.split('/').pop().replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') : null) ||
+      songId;
+
+    const email = auth?.currentUser?.email || '';
+    const name = email.toLowerCase().includes('saini') ? 'Saini' : 'Jit';
+
+    await logVaultAction({
+      action: 'delete',
+      type: 'song',
+      title: songName,
+      category: 'music',
+      details: {
+        id: songId,
+        storageKey: storageKey,
+      },
+      userEmail: email,
+      userName: name,
+    });
+  } catch (logErr) {
+    console.warn('[musicStorage] Notice logging delete action:', logErr);
   }
 
   // 4. Trigger application-wide refresh

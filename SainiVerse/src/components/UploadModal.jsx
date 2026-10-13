@@ -3,6 +3,7 @@ import { ref, uploadBytesResumable } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { storage, db, isFirebaseConfigured } from '../firebase';
 import { sanitizeImage } from '../utils/sanitizeImage';
+import { logVaultAction } from '../utils/activityLogger';
 import confetti from 'canvas-confetti';
 import {
   X,
@@ -137,7 +138,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, currentU
           memoryDate: memoryDate,
           tag: tag,
           uploadedBy: currentUser?.email || 'partner',
-          uploaderName: currentUser?.displayName || (currentUser?.email?.includes('jith') ? 'Jith' : 'Her'),
+          uploaderName: currentUser?.displayName || ((currentUser?.email || '').toLowerCase().includes('saini') ? 'Saini' : 'Jit'),
           width: sanitized.width,
           height: sanitized.height,
           createdAt: serverTimestamp(),
@@ -155,6 +156,24 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, currentU
         setUploadProgress(100);
 
         triggerLoveConfetti();
+
+        // Record action in Activity Logs
+        try {
+          logVaultAction({
+            action: 'add',
+            type: 'image',
+            title: memoryDoc.caption,
+            category: 'public',
+            details: {
+              tag: memoryDoc.tag,
+              fileName: memoryDoc.fileName,
+            },
+            userEmail: memoryDoc.uploadedBy,
+            userName: memoryDoc.uploaderName,
+          });
+        } catch (logErr) {
+          console.warn('[UploadModal] Notice logging action:', logErr);
+        }
 
         if (onUploadSuccess) {
           onUploadSuccess({
@@ -186,8 +205,8 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, currentU
           caption: caption.trim() || 'Treasured Memory',
           memoryDate: memoryDate,
           tag: tag,
-          uploadedBy: currentUser?.email || 'jith@sainiverse.internal',
-          uploaderName: currentUser?.displayName || (currentUser?.email?.includes('jith') ? 'Jith' : 'Her'),
+          uploadedBy: currentUser?.email || 'Jit@sainiverse.internal',
+          uploaderName: currentUser?.displayName || ((currentUser?.email || '').toLowerCase().includes('saini') ? 'Saini' : 'Jit'),
           width: sanitized.width,
           height: sanitized.height,
           createdAt: new Date().toISOString(),

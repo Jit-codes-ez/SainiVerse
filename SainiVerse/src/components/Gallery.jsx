@@ -98,7 +98,9 @@ export default function Gallery({
       {/* Grid of Memories */}
       <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 xs:gap-4 sm:gap-6">
         {filteredMemories.map((memory) => {
-          const isUploaderJith = (memory.uploadedBy || '').toLowerCase().includes('jith');
+          const isUploaderJit =
+            (memory.uploadedBy || '').toLowerCase().includes('jit') ||
+            (memory.uploaderName || '').toLowerCase().includes('jit');
 
           return (
             <div
@@ -146,12 +148,12 @@ export default function Gallery({
                   {/* Partner tag */}
                   <span
                     className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                      isUploaderJith
+                      isUploaderJit
                         ? 'bg-rose-100 text-rose-700 border border-rose-200'
                         : 'bg-pink-100 text-pink-700 border border-pink-200'
                     }`}
                   >
-                    {memory.uploaderName || (isUploaderJith ? 'Jith' : 'Her')}
+                    {memory.uploaderName && memory.uploaderName !== 'Partner' && memory.uploaderName !== 'Her' ? memory.uploaderName : (isUploaderJit ? 'Jit' : 'Saini')}
                   </span>
                 </div>
               </div>

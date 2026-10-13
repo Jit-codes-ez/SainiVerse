@@ -25,8 +25,31 @@ function apiDevMiddleware() {
               return this.end(JSON.stringify(data));
             };
           }
+          if (!res.send) {
+            res.send = function (data) {
+              return this.end(data);
+            };
+          }
+          if (!res.redirect) {
+            res.redirect = function (statusOrUrl, url) {
+              const code = typeof statusOrUrl === 'number' ? statusOrUrl : 302;
+              const target = typeof statusOrUrl === 'number' ? url : statusOrUrl;
+              if (this.writeHead) {
+                this.writeHead(code, { Location: target });
+              } else {
+                this.statusCode = code;
+                this.setHeader('Location', target);
+              }
+              return this.end();
+            };
+          }
 
           req.query = Object.fromEntries(parsedUrl.searchParams.entries());
+
+          if (pathname === '/api/get-social-avatar') {
+            const { default: handler } = await server.ssrLoadModule('/api/get-social-avatar.js');
+            return await handler(req, res);
+          }
 
           if (pathname === '/api/get-music') {
             const { default: handler } = await server.ssrLoadModule('/api/get-music.js');
@@ -80,24 +103,6 @@ function apiDevMiddleware() {
 
           if (pathname === '/api/suggest-caption') {
             const { default: handler } = await server.ssrLoadModule('/api/suggest-caption.js');
-            let bodyStr = '';
-            req.on('data', (chunk) => (bodyStr += chunk));
-            req.on('end', async () => {
-              try {
-                req.body = bodyStr ? JSON.parse(bodyStr) : {};
-              } catch {
-                req.body = bodyStr;
-              }
-              await handler(req, res);
-            });
-            return;
-          }
-
-          if (pathname === '/api/love-meter') {
-            const { default: handler } = await server.ssrLoadModule('/api/love-meter.js');
-            if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
-              return await handler(req, res);
-            }
             let bodyStr = '';
             req.on('data', (chunk) => (bodyStr += chunk));
             req.on('end', async () => {

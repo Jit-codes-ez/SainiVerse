@@ -20,11 +20,12 @@ import {
   Globe,
   Home,
   Check,
+  User,
 } from 'lucide-react';
 
 export default function Memories() {
   const navigate = useNavigate();
-  const { memories, selectedMemory, setSelectedMemory, handleDeleteMemory, isLoadingMemories } = useVault();
+  const { memories, selectedMemory, setSelectedMemory, handleDeleteMemory, isLoadingMemories, isLoggedIn } = useVault();
 
   const [selectedTag, setSelectedTag] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -313,8 +314,9 @@ export default function Memories() {
                         <span>{formatMemoryDate(memory.memoryDate || memory.createdAt)}</span>
                       </div>
 
-                      <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold">
-                        {memory.uploaderName || 'Partner'}
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200/60 shadow-2xs">
+                        <User className="w-2.5 h-2.5 text-rose-500" />
+                        <span>{memory.uploaderName && memory.uploaderName !== 'Partner' ? memory.uploaderName : 'Jit'}</span>
                       </span>
                     </div>
                   </div>
@@ -333,7 +335,7 @@ export default function Memories() {
           isOpen={Boolean(selectedMemory)}
           onClose={() => setSelectedMemory(null)}
           onNavigate={(m) => setSelectedMemory(m)}
-          onDelete={handleDeleteMemory}
+          onDelete={isLoggedIn ? handleDeleteMemory : undefined}
         />
       )}
     </div>

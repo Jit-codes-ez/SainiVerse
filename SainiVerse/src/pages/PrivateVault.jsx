@@ -11,8 +11,10 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { sanitizeImage } from '../utils/sanitizeImage';
 import { formatMemoryDate } from '../utils/dateUtils';
-import { triggerMemoriesRefresh, isPrivateMemory } from '../utils/memoryStorage';
+import { triggerMemoriesRefresh, isPrivateMemory, deleteMemory } from '../utils/memoryStorage';
 import { uploadMusicToR2AndFirestore, subscribeMusic, deleteSongFromFirestore } from '../utils/musicStorage';
+import { logVaultAction } from '../utils/activityLogger';
+import VaultActivityLogsModal from '../components/VaultActivityLogsModal';
 import Card from '../components/Card';
 import CardGlare from '../components/CardGlare';
 import SecureImage, { lruBlobCache } from '../components/SecureImage';
@@ -22,6 +24,7 @@ import {
   Sparkles,
   Camera,
   Music,
+  Activity,
   Calendar,
   Lock,
   Unlock,
@@ -119,6 +122,7 @@ export default function PrivateVault() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadVisibility, setUploadVisibility] = useState('private'); // 'private' | 'public'
   const [isSongModalOpen, setIsSongModalOpen] = useState(false);
+  const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
 
   // Upload Form State
   const [selectedFile, setSelectedFile] = useState(null);
@@ -419,6 +423,25 @@ export default function PrivateVault() {
           });
         }
 
+        // Record action in Activity Logs
+        try {
+          await logVaultAction({
+            action: 'add',
+            type: 'image',
+            title: memoryDoc.caption,
+            category: uploadVisibility,
+            details: {
+              tag: memoryDoc.tag,
+              fileName: memoryDoc.fileName,
+              storageKey: uniqueId,
+            },
+            userEmail: memoryDoc.uploadedBy,
+            userName: memoryDoc.uploaderName,
+          });
+        } catch (logErr) {
+          console.warn('[PrivateVault] Notice logging photo action:', logErr);
+        }
+
         // Trigger real-time sync with Cloudflare R2
         triggerMemoriesRefresh();
       } else {
@@ -539,7 +562,7 @@ export default function PrivateVault() {
       await uploadMusicToR2AndFirestore({
         file: selectedSongFile,
         title: newSongTitle.trim(),
-        artist: newSongArtist.trim() || 'Custom Vault Melody',
+        artist: newSongArtist.trim(),
         dedication: newSongDedication.trim() || 'For Saini & Jit',
         uploaderName: uploader,
         onProgress: (p) => setSongUploadProgress(p),
@@ -785,6 +808,49 @@ export default function PrivateVault() {
               </div>
             </div>
           </Card>
+
+          {/* OPTION 3: LOG & ACTIONS */}
+          <Card
+            variant="purple"
+            onClick={() => setIsLogsModalOpen(true)}
+            className="h-[290px] sm:h-[310px] bg-white/80 hover:bg-white/95 backdrop-blur-md border border-purple-200/90 hover:border-purple-400 shadow-md hover:shadow-xl transition-all cursor-pointer"
+          >
+            <div className="h-full w-full p-6 flex flex-col justify-between text-left">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-rose-500 text-white flex items-center justify-center shadow-md">
+                    <Activity className="w-6 h-6" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                    Audit Trail
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <h3
+                    className="text-xl sm:text-2xl font-bold text-purple-950 font-berkshire"
+                    style={{ fontFamily: "'Berkshire Swash', cursive, serif" }}
+                  >
+                    Log & Actions
+                  </h3>
+                  <p className="text-xs text-purple-700 font-semibold">
+                    Track Sanctuary Modifications
+                  </p>
+                </div>
+
+                <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
+                  Inspect real-time logs of every photo and song added or deleted across the sanctuary with exact timestamps and user details.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-purple-100 flex items-center justify-between text-purple-800 text-xs font-bold">
+                <span>View Activity Logs</span>
+                <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Activity className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       </section>
 
@@ -941,7 +1007,7 @@ export default function PrivateVault() {
 
                     <div className="pt-2 border-t border-rose-50 flex items-center justify-between text-[11px] text-gray-500 font-medium">
                       <span>{formatMemoryDate(memory.memoryDate)}</span>
-                      <span className="text-rose-600 font-semibold">{memory.uploaderName || 'Partner'}</span>
+                      <span className="text-rose-600 font-semibold">{memory.uploaderName && memory.uploaderName !== 'Partner' ? memory.uploaderName : 'Jit'}</span>
                     </div>
                   </div>
                 </motion.div>
@@ -1548,7 +1614,7 @@ export default function PrivateVault() {
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-gray-900 truncate">{song.title}</p>
                           <p className="text-[10px] text-gray-500 truncate">
-                            {song.artist} • By {song.uploaderName || 'Vault'}
+                            {song.artist} • By {song.uploaderName && song.uploaderName !== 'Partner' && song.uploaderName !== 'Vault' ? song.uploaderName : 'Jit'}
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -1673,6 +1739,12 @@ export default function PrivateVault() {
           onDelete={handleDeleteMemory}
         />
       )}
+
+      {/* 8. SANCTUARY LOGS & ACTIONS MODAL */}
+      <VaultActivityLogsModal
+        isOpen={isLogsModalOpen}
+        onClose={() => setIsLogsModalOpen(false)}
+      />
     </>
   );
 }

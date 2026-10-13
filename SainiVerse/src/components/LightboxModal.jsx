@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import SecureImage from './SecureImage';
 import { formatMemoryDate } from '../utils/dateUtils';
+import { useVault } from '../context/VaultContext';
+import { auth } from '../firebase';
 import {
   X,
   ChevronLeft,
@@ -23,6 +25,8 @@ export default function LightboxModal({
   onNavigate,
   onDelete,
 }) {
+  const { isLoggedIn } = useVault();
+  const canDelete = Boolean(onDelete && (isLoggedIn || auth?.currentUser));
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -49,7 +53,7 @@ export default function LightboxModal({
   }, [currentIndex, hasNext, memories, onNavigate]);
 
   const handleConfirmDelete = async () => {
-    if (!memory || !onDelete) return;
+    if (!memory || !onDelete || !canDelete) return;
     try {
       setIsDeleting(true);
       await onDelete(memory);
@@ -85,7 +89,9 @@ export default function LightboxModal({
 
   if (!isOpen || !memory) return null;
 
-  const isUploaderJith = (memory.uploadedBy || '').toLowerCase().includes('jith');
+  const isUploaderJit =
+    (memory.uploadedBy || '').toLowerCase().includes('jit') ||
+    (memory.uploaderName || '').toLowerCase().includes('jit');
 
   return (
     <div
@@ -100,7 +106,7 @@ export default function LightboxModal({
         </div>
 
         <div className="pointer-events-auto flex items-center gap-2">
-          {onDelete && (
+          {canDelete && (
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
@@ -180,8 +186,8 @@ export default function LightboxModal({
               <User className="w-3.5 h-3.5 text-rose-300" />
               <span className="flex items-center gap-1.5">
                 Uploaded by{' '}
-                <span className={`font-medium ${isUploaderJith ? 'text-rose-300' : 'text-pink-300'}`}>
-                  {memory.uploaderName || (isUploaderJith ? 'Jith' : 'Partner')}
+                <span className={`font-medium ${isUploaderJit ? 'text-rose-300' : 'text-pink-300'}`}>
+                  {memory.uploaderName && memory.uploaderName !== 'Partner' ? memory.uploaderName : (isUploaderJit ? 'Jit' : 'Saini')}
                 </span>
               </span>
             </div>
@@ -197,7 +203,7 @@ export default function LightboxModal({
 
       {/* CUSTOM CONFIRMATION MODAL POP-UP (Replaces browser window.confirm) */}
       <AnimatePresence>
-        {showDeleteModal && (
+        {showDeleteModal && canDelete && (
           <div
             className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
             onClick={(e) => {

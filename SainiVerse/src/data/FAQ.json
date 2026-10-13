@@ -18,9 +18,9 @@
     "answer": "The universe is set to 'Bhalobashar Morshum' (ভালবাসার মরশুম) — a tender, timeless Bengali melody that echoes the gentle rhythm of our love and shared memories."
   },
   {
-    "id": "security",
-    "question": "How is our private sanctuary protected?",
-    "icon": "ShieldCheck",
-    "answer": "Every photo uploaded is automatically sanitized to remove camera EXIF and GPS markers. Our memories are preserved in a secure private cloud, and our deepest letters are protected behind the private passcode vault."
+    "id": "builder",
+    "question": "Who has built SainiVerse?",
+    "icon": "Stars",
+    "answer": "SainiVerse is built by Jit Hazra. Contact - jithazra00@gmail.com"
   }
 ]

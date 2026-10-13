@@ -1,7 +1,6 @@
 import React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import GuestLoveWidget from '../components/GuestLoveWidget';
 import StatusToast from '../components/StatusToast';
 import Footer from '../components/Footer';
 import FloatingHearts from '../components/FloatingHearts';
@@ -19,6 +18,7 @@ export default function MainLayout() {
   const { isNavbarPlaying, toggleNavbarMusic, navbarTrack } = useAudio();
   const {
     user,
+    isLoggedIn,
     memories,
     visitorRole,
     toggleRole,
@@ -85,8 +85,6 @@ export default function MainLayout() {
         navbarTrack={navbarTrack}
       />
 
-      {/* Interactive Guest Love Widget */}
-      <GuestLoveWidget visitorRole={visitorRole} />
 
       {/* Floating Status Notification */}
       <StatusToast message={notification} />
@@ -128,7 +126,7 @@ export default function MainLayout() {
         isOpen={Boolean(selectedMemory)}
         onClose={() => setSelectedMemory(null)}
         onNavigate={setSelectedMemory}
-        onDelete={handleDeleteMemory}
+        onDelete={isLoggedIn ? handleDeleteMemory : undefined}
       />
     </div>
   );

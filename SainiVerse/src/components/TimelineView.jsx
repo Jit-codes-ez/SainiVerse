@@ -82,7 +82,9 @@ export default function TimelineView({
             {/* List of Memories for this period */}
             <div className="space-y-4 sm:space-y-6 ml-3 xs:ml-6">
               {items.map((memory) => {
-                const isUploaderJith = (memory.uploadedBy || '').toLowerCase().includes('jith');
+                const isUploaderJit =
+                  (memory.uploadedBy || '').toLowerCase().includes('jit') ||
+                  (memory.uploaderName || '').toLowerCase().includes('jit');
 
                 return (
                   <div
@@ -121,12 +123,12 @@ export default function TimelineView({
                       <div className="flex items-center gap-2">
                         <span
                           className={`text-[11px] px-3 py-0.5 rounded-full font-semibold ${
-                            isUploaderJith
+                            isUploaderJit
                               ? 'bg-rose-100 text-rose-700 border border-rose-200'
                               : 'bg-pink-100 text-pink-700 border border-pink-200'
                           }`}
                         >
-                          Uploaded by {memory.uploaderName || (isUploaderJith ? 'Jith' : 'Her')}
+                          Uploaded by {memory.uploaderName && memory.uploaderName !== 'Partner' && memory.uploaderName !== 'Her' ? memory.uploaderName : (isUploaderJit ? 'Jit' : 'Saini')}
                         </span>
                       </div>
                     </div>

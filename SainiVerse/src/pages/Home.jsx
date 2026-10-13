@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
 import quotes from '../data/Quote.json';
+import loveLetters from '../data/LoveLetterContent.json';
 import { calculateDaysTogether } from '../utils/dateUtils';
 import { useVault } from '../context/VaultContext';
 import { useAudio } from '../context/AudioContext';
@@ -95,11 +96,88 @@ export default function Home(props = {}) {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [firebaseUser, setFirebaseUser] = useState(null);
 
+  // Rotateable love letter state (randomized on initial load, supports cycling through letters)
+  const lettersList = useMemo(() => {
+    return Array.isArray(loveLetters) && loveLetters.length > 0 ? loveLetters : [];
+  }, []);
+
+  const [activeLetterId, setActiveLetterId] = useState(() => {
+    const list = Array.isArray(loveLetters) ? loveLetters : [];
+    if (list.length === 0) return 0;
+    return Math.floor(Math.random() * list.length);
+  });
+
+  const currentLoveLetter = useMemo(() => {
+    if (lettersList.length === 0) return null;
+    return lettersList[activeLetterId % lettersList.length] || lettersList[0];
+  }, [lettersList, activeLetterId]);
+
+  const handleNextLetter = () => {
+    if (lettersList.length <= 1) return;
+    setActiveLetterId((prev) => (prev + 1) % lettersList.length);
+  };
+
+  const currentLetterTitle =
+    currentLoveLetter?.Title ||
+    currentLoveLetter?.title ||
+    'A Letter To My Forever';
+
+  const letterSalutation =
+    currentLoveLetter?.Salutation ||
+    currentLoveLetter?.salutation ||
+    'My Dearest Love,';
+
+  const letterParagraphs = useMemo(() => {
+    if (!currentLoveLetter) return [];
+    const bodyContent = currentLoveLetter.Body ?? currentLoveLetter.body;
+    if (Array.isArray(bodyContent)) {
+      return bodyContent;
+    }
+    if (typeof bodyContent === 'string') {
+      return bodyContent.split('\n\n').filter(Boolean);
+    }
+    return [];
+  }, [currentLoveLetter]);
+
+  const letterClose =
+    currentLoveLetter?.['Complimentary Close'] ||
+    currentLoveLetter?.ComplimentaryClose ||
+    currentLoveLetter?.complimentaryClose ||
+    currentLoveLetter?.complimentary_close ||
+    'Forever Yours,';
+
+  const letterSignature =
+    currentLoveLetter?.['Signature Line'] ||
+    currentLoveLetter?.SignatureLine ||
+    currentLoveLetter?.signatureLine ||
+    currentLoveLetter?.signature_line ||
+    currentLoveLetter?.signature ||
+    'Jit 💕';
+
   const currentQuote = quotes[activeQuoteIndex] || quotes[0];
   const isTodayQuote = activeQuoteIndex === todayDayOfYearIndex;
 
   const daysInfo = calculateDaysTogether();
   const coupleNames = import.meta.env.VITE_COUPLE_NAMES || 'Jit & Saini';
+
+  // Calculate upcoming birthday
+  const nextBirthday = useMemo(() => {
+    const envDate = import.meta.env.VITE_SAINI_BIRTHDAY_DATE || '2005-05-20';
+    const start = new Date(envDate);
+    const now = new Date();
+    let next = new Date(now.getFullYear(), start.getMonth(), start.getDate());
+    if (next < now) {
+      next.setFullYear(now.getFullYear() + 1);
+    }
+    const diff = Math.ceil((next - now) / (1000 * 60 * 60 * 24));
+    return {
+      daysLeft: diff === 0 ? 0 : diff,
+      dateString: next.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      }),
+    };
+  }, []);
 
   // Calculate upcoming anniversary
   const nextAnniversaryDays = useMemo(() => {
@@ -566,7 +644,7 @@ export default function Home(props = {}) {
 
                 <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
                   {audio?.currentTrack?.title
-                    ? `Now playing "${audio.currentTrack.title}". Open our animated vinyl player to explore our full playlist.`
+                    ? `Now playing "${audio.currentTrack.title}${audio.currentTrack.artist ? ` • ${audio.currentTrack.artist}` : ''}". Open our animated vinyl player to explore our full playlist.`
                     : 'Listen to our romantic playlist streaming from the vault. Open our animated player to explore our melodies in endless orbit.'}
                 </p>
               </div>
@@ -616,6 +694,20 @@ export default function Home(props = {}) {
                 <div className="space-y-2 text-xs text-gray-600 leading-relaxed">
                   <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/70 space-y-1">
                     <div className="flex items-center justify-between text-amber-900 font-bold">
+                      <span>Next Birthday:</span>
+                      <span className="text-rose-600">{nextBirthday.dateString}</span>
+                    </div>
+                    <div className="text-[11px] text-amber-800 font-medium">
+                      {nextBirthday.daysLeft === 0
+                        ? "Today is Saini's Birthday!"
+                        : `${nextBirthday.daysLeft} days until Saini's Birthday!`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-gray-600 leading-relaxed">
+                  <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/70 space-y-1">
+                    <div className="flex items-center justify-between text-amber-900 font-bold">
                       <span>Next Anniversary:</span>
                       <span className="text-rose-600">{nextAnniversaryDays.dateString}</span>
                     </div>
@@ -631,7 +723,7 @@ export default function Home(props = {}) {
               {/* Bottom: Action Trigger Button */}
               <div className="pt-4 border-t border-rose-100 flex items-center justify-between text-amber-800 text-xs font-bold">
                 <span className="flex items-center gap-1 group-hover:underline">
-                  Open Special Countdown ✨
+                  Open Special Countdown
                 </span>
                 <div className="w-8 h-8 rounded-full bg-amber-100 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center transition-all duration-300">
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -859,7 +951,7 @@ export default function Home(props = {}) {
                       ) : (
                         <>
                           <Sparkles className="w-4 h-4" />
-                          <span>Create Vault Access ✨</span>
+                          <span>Create Vault Access</span>
                         </>
                       )}
                     </button>
@@ -878,42 +970,50 @@ export default function Home(props = {}) {
                         Authenticated as <span className="font-semibold">{firebaseUser.email}</span> 💕
                       </p>
                     )}
-                    <h3
-                      className="text-2xl sm:text-3xl font-bold text-rose-950 font-berkshire"
-                      style={{ fontFamily: "'Berkshire Swash', cursive, serif" }}
-                    >
-                      A Letter To My Forever
-                    </h3>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <h3
+                        className="text-2xl sm:text-3xl font-bold text-rose-950 font-berkshire"
+                        style={{ fontFamily: "'Berkshire Swash', cursive, serif" }}
+                      >
+                        {currentLetterTitle}
+                      </h3>
+                    </div>
+                    {lettersList.length > 1 && (
+                      <div className="flex items-center justify-center gap-2 text-[11px]">
+                        <span className="text-rose-600/80 font-medium">
+                          Letter {(activeLetterId % lettersList.length) + 1} of {lettersList.length}
+                        </span>
+                        <span>•</span>
+                        <button
+                          type="button"
+                          onClick={handleNextLetter}
+                          className="text-rose-700 hover:text-rose-900 font-semibold underline underline-offset-2 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Shuffle className="w-3 h-3" />
+                          <span>Shuffle Letter</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Love Letter Body */}
                   <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-50/90 to-pink-50/80 border border-rose-200 space-y-4 text-xs sm:text-sm text-gray-700 leading-relaxed">
                     <p className="font-semibold text-rose-900 italic">
-                      My Dearest Love,
+                      {letterSalutation}
                     </p>
-                    <p>
-                      Every piece of this universe was built with you at the center. In a world full of noise, you are my sanctuary, my calm, and the sweetest melody I've ever heard.
-                    </p>
-                    <p>
-                      Through every day we count, every photo we seal, and every milestone we celebrate — I will always be proud to orbit right beside you.
-                    </p>
+                    {letterParagraphs.length > 0 ? (
+                      letterParagraphs.map((paragraph, idx) => (
+                        <p key={idx}>{paragraph}</p>
+                      ))
+                    ) : (
+                      <p>
+                        Every piece of this universe was built with you at the center. In a world full of noise, you are my sanctuary, my calm, and the sweetest melody I've ever heard.
+                      </p>
+                    )}
                     <p className="text-right font-bold text-rose-900 font-berkshire text-base pt-2">
-                      Forever Yours, <br />
-                      Jit 💕
+                      {letterClose} <br />
+                      {letterSignature}
                     </p>
-                  </div>
-
-                  {/* Sacred Promises */}
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Our Sacred Promises</span>
-                    </h4>
-                    <ul className="text-xs text-gray-600 space-y-1.5 list-disc list-inside">
-                      <li>To always listen to your heartbeat when you need comfort.</li>
-                      <li>To make you laugh on days when the universe feels heavy.</li>
-                      <li>To keep curating our memories, in endless orbit, forever.</li>
-                    </ul>
                   </div>
 
                   {/* Enter Private Vault Studio CTA */}
@@ -936,7 +1036,7 @@ export default function Home(props = {}) {
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-purple-300 transition-all cursor-pointer whitespace-nowrap"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Enter Studio ✨</span>
+                      <span>Enter Studio</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>

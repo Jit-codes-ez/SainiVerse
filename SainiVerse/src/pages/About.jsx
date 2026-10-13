@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import CardGlare from '../components/CardGlare';
-import Card from '../components/Card';
 import { calculateDaysTogether } from '../utils/dateUtils';
 import { useAudio } from '../context/AudioContext';
 import { useVault } from '../context/VaultContext';
@@ -17,15 +16,11 @@ import {
   Stars,
   ShieldCheck,
   ChevronDown,
-  Volume2,
-  Play,
-  Pause,
-  ArrowRight,
-  Flame,
   Gift,
 } from 'lucide-react';
 import faqs from '../data/FAQ.json';
 import lovePledges from '../data/LovePledges.json';
+import SocialCard from '../components/SocialCard';
 
 const ICON_MAP = {
   Heart,
@@ -48,6 +43,15 @@ export default function About() {
   const [activeSecret, setActiveSecret] = useState(faqs[0]?.id || 'origin');
   const [promiseIndex, setPromiseIndex] = useState(0);
   const [pledgePulsing, setPledgePulsing] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  const handleCopy = (text, key) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
 
   const handleNextPromise = () => {
     setPledgePulsing(true);
@@ -295,7 +299,7 @@ export default function About() {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-rose-500 hover:bg-rose-600 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-400/30 transition-all cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Spark Another Promise ✨</span>
+              <span>Spark Another Promise </span>
             </button>
           </div>
 
@@ -305,7 +309,10 @@ export default function About() {
         </div>
       </section>
 
-      {/* 6. BOTTOM NAVIGATION CALL TO ACTION */}
+      {/* 6. OUR SOCIAL CONSTELLATION: INSTA & FACEBOOK HANDLES */}
+      <SocialCard />
+
+      {/* 7. BOTTOM NAVIGATION CALL TO ACTION */}
       <section className="text-center pt-4">
         <button
           type="button"

@@ -1,6 +1,7 @@
 import { collection, onSnapshot, deleteDoc, doc, query, where, getDocs } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, auth, storage, isFirebaseConfigured } from '../firebase';
+import { logVaultAction } from './activityLogger';
 
 const LOCAL_STORAGE_KEY = 'sainiverse_memories_store';
 
@@ -120,7 +121,7 @@ export function subscribeToMemories(callback) {
   const emitMerged = () => {
     if (!isMounted) return;
 
-    // Index all Firestore docs by storageKey, id, and fileName
+    // Index all Firestore docs by storageKey, storagePath, id, and fileName
     const fsMap = new Map();
     const allFsDocs = [...firestorePublicDocs, ...firestorePrivateDocs, ...firestoreLegacyDocs];
     for (const d of allFsDocs) {
@@ -130,30 +131,67 @@ export function subscribeToMemories(callback) {
       if (d.fileName) fsMap.set(d.fileName, d);
     }
 
+    // Helper to find corresponding Firestore romantic metadata document
+    const findMatchingDoc = (r2) => {
+      if (!r2) return null;
+      if (r2.storageKey && fsMap.has(r2.storageKey)) return fsMap.get(r2.storageKey);
+      if (r2.fileName && fsMap.has(r2.fileName)) return fsMap.get(r2.fileName);
+      if (r2.id && fsMap.has(r2.id)) return fsMap.get(r2.id);
+
+      const normR2Key = (r2.storageKey || '')
+        .replace(/^\/+/, '')
+        .replace('Public_Memories/', 'Public_Memory/')
+        .replace('Private_Memories/', 'Private_Memory/');
+
+      for (const d of allFsDocs) {
+        const normDocKey = (d.storageKey || d.storagePath || '')
+          .replace(/^\/+/, '')
+          .replace('Public_Memories/', 'Public_Memory/')
+          .replace('Private_Memories/', 'Private_Memory/');
+
+        if (normDocKey && normDocKey === normR2Key) return d;
+        if (d.id && normR2Key.includes(d.id)) return d;
+        if (d.fileName && (normR2Key.endsWith(d.fileName) || r2.fileName === d.fileName)) return d;
+      }
+      return null;
+    };
+
     const resultMap = new Map();
 
     // 1. Process all real Cloudflare R2 Public Photos
     for (const r2 of r2PublicList) {
       if (isMemoryDeleted(r2)) continue;
-      const match =
-        fsMap.get(r2.storageKey) ||
-        fsMap.get(r2.fileName) ||
-        fsMap.get(r2.id) ||
-        allFsDocs.find((d) => d.storageKey === r2.storageKey || (d.id && r2.storageKey.includes(d.id)));
+      const match = findMatchingDoc(r2);
+
+      const email = (match?.uploadedBy || '').toLowerCase();
+      const rawUploader = (match?.uploaderName || '').trim();
+      let finalUploader = 'Jit';
+      if (rawUploader && rawUploader !== 'Partner' && rawUploader !== 'Her') {
+        finalUploader = rawUploader;
+      } else if (email.includes('saini')) {
+        finalUploader = 'Saini';
+      } else if (email.includes('jit')) {
+        finalUploader = 'Jit';
+      }
+
+      const rawCap = (match?.caption || '').trim();
+      const fallbackCap = r2.fileName && !/^[a-f0-9-]{36}/i.test(r2.fileName)
+        ? r2.fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+        : 'Special Moment';
 
       const memoryItem = {
         id: match?.id || r2.id,
         storageKey: r2.storageKey,
         storagePath: r2.storageKey,
         fileName: match?.fileName || r2.fileName,
-        caption: match?.caption || r2.fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+        caption: rawCap || fallbackCap,
         memoryDate:
           match?.memoryDate ||
           (r2.lastModified ? r2.lastModified.split('T')[0] : new Date().toISOString().split('T')[0]),
         tag: match?.tag || 'Special Moment',
         visibility: 'public',
-        uploadedBy: match?.uploadedBy || 'hers.jit@gmail.com',
-        uploaderName: match?.uploaderName || 'Jit & Saini',
+        uploadedBy: match?.uploadedBy || (finalUploader === 'Jit' ? 'hers.jit@gmail.com' : 'his.saini.gulu@gmail.com'),
+        uploaderName: finalUploader,
         width: match?.width,
         height: match?.height,
         createdAt: match?.createdAt || r2.lastModified,
@@ -164,25 +202,34 @@ export function subscribeToMemories(callback) {
     // 2. Process all real Cloudflare R2 Private Photos (if authenticated)
     for (const r2 of r2PrivateList) {
       if (isMemoryDeleted(r2)) continue;
-      const match =
-        fsMap.get(r2.storageKey) ||
-        fsMap.get(r2.fileName) ||
-        fsMap.get(r2.id) ||
-        allFsDocs.find((d) => d.storageKey === r2.storageKey || (d.id && r2.storageKey.includes(d.id)));
+      const match = findMatchingDoc(r2);
+
+      const email = (match?.uploadedBy || '').toLowerCase();
+      const rawUploader = (match?.uploaderName || '').trim();
+      let finalUploader = 'Jit';
+      if (rawUploader && rawUploader !== 'Partner' && rawUploader !== 'Her') {
+        finalUploader = rawUploader;
+      } else if (email.includes('saini')) {
+        finalUploader = 'Saini';
+      } else if (email.includes('jit')) {
+        finalUploader = 'Jit';
+      }
+
+      const rawCap = (match?.caption || '').trim();
 
       const memoryItem = {
         id: match?.id || r2.id,
         storageKey: r2.storageKey,
         storagePath: r2.storageKey,
         fileName: match?.fileName || r2.fileName,
-        caption: match?.caption || 'Confidential Whispered Memory',
+        caption: rawCap || 'Confidential Whispered Memory',
         memoryDate:
           match?.memoryDate ||
           (r2.lastModified ? r2.lastModified.split('T')[0] : new Date().toISOString().split('T')[0]),
         tag: match?.tag || 'Just Us',
         visibility: 'private',
-        uploadedBy: match?.uploadedBy || 'hers.jit@gmail.com',
-        uploaderName: match?.uploaderName || 'Jit & Saini',
+        uploadedBy: match?.uploadedBy || (finalUploader === 'Jit' ? 'hers.jit@gmail.com' : 'his.saini.gulu@gmail.com'),
+        uploaderName: finalUploader,
         width: match?.width,
         height: match?.height,
         createdAt: match?.createdAt || r2.lastModified,
@@ -198,6 +245,17 @@ export function subscribeToMemories(callback) {
         const isPriv = isPrivateMemory(d);
         if (isPriv && !auth?.currentUser) continue;
 
+        const email = (d.uploadedBy || '').toLowerCase();
+        const rawUploader = (d.uploaderName || '').trim();
+        let finalUploader = 'Jit';
+        if (rawUploader && rawUploader !== 'Partner' && rawUploader !== 'Her') {
+          finalUploader = rawUploader;
+        } else if (email.includes('saini')) {
+          finalUploader = 'Saini';
+        } else if (email.includes('jit')) {
+          finalUploader = 'Jit';
+        }
+
         resultMap.set(key, {
           id: d.id,
           storageKey: d.storageKey || d.storagePath || key,
@@ -209,8 +267,8 @@ export function subscribeToMemories(callback) {
             (d.createdAt?.toDate?.() ? d.createdAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
           tag: d.tag || (isPriv ? 'Just Us' : 'Special Moment'),
           visibility: isPriv ? 'private' : 'public',
-          uploadedBy: d.uploadedBy || 'hers.jit@gmail.com',
-          uploaderName: d.uploaderName || 'Jit & Saini',
+          uploadedBy: d.uploadedBy || (finalUploader === 'Jit' ? 'hers.jit@gmail.com' : 'his.saini.gulu@gmail.com'),
+          uploaderName: finalUploader,
           width: d.width || 0,
           height: d.height || 0,
           createdAt: d.createdAt,
@@ -244,14 +302,25 @@ export function subscribeToMemories(callback) {
     callback(combined);
   };
 
-  // Asynchronously fetch Cloudflare R2 photos
+  // Asynchronously fetch Cloudflare R2 photos and fast parallel fetch of Firestore metadata
   const loadR2Data = async () => {
     if (!isMounted) return;
 
     try {
-      const pub = await fetchR2Photos('public');
+      const [pub, fsPublicSnap] = await Promise.all([
+        fetchR2Photos('public'),
+        isFirebaseConfigured && db ? getDocs(collection(db, 'Public_Memory_Details')).catch(() => null) : null,
+      ]);
+
       if (isMounted) {
         r2PublicList = pub;
+        if (fsPublicSnap && Array.isArray(fsPublicSnap.docs) && fsPublicSnap.docs.length > 0) {
+          firestorePublicDocs = fsPublicSnap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+            visibility: 'public',
+          }));
+        }
         emitMerged();
       }
     } catch (e) {
@@ -434,6 +503,10 @@ export function saveDemoMemory(memory) {
 export async function deleteMemory(memory) {
   if (!memory) return;
 
+  if (!auth?.currentUser) {
+    throw new Error('Unauthorized: Authentication required to delete memories.');
+  }
+
   // 1. Immediately blacklist this memory in memory and trigger instant sync across UI
   markMemoryAsDeleted(memory);
   triggerMemoriesRefresh();
@@ -518,18 +591,41 @@ export async function deleteMemory(memory) {
     }
   }
 
-  // 4. Demo Mode / LocalStorage cleanup
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (stored) {
-      const list = JSON.parse(stored);
-      const filtered = list.filter((m) => m.id !== memory.id && m.storageKey !== r2Key);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (stored) {
+        const list = JSON.parse(stored);
+        const filtered = list.filter((m) => m.id !== memory.id && m.storageKey !== r2Key);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+      }
+    } catch (err) {
+      console.error('Failed deleting demo memory:', err);
     }
-  } catch (err) {
-    console.error('Failed deleting demo memory:', err);
-  }
 
-  // 5. Trigger application-wide refresh
+    // Record action in Activity Logs
+    try {
+      const email = auth?.currentUser?.email || '';
+      const name = email.toLowerCase().includes('saini') ? 'Saini' : 'Jit';
+      const isPriv = isPrivateMemory(memory);
+
+      await logVaultAction({
+        action: 'delete',
+        type: 'image',
+        title: memory.caption || memory.fileName || 'Memory Photo',
+        category: isPriv ? 'private' : 'public',
+        details: {
+          id: memory.id,
+          storageKey: r2Key,
+          tag: memory.tag,
+          fileName: memory.fileName,
+        },
+        userEmail: email,
+        userName: name,
+      });
+    } catch (logErr) {
+      console.warn('[memoryStorage] Notice logging delete action:', logErr);
+    }
+
+    // 5. Trigger application-wide refresh
   triggerMemoriesRefresh();
 }
